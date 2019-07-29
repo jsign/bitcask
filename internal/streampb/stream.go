@@ -6,6 +6,7 @@ import (
 	"io"
 
 	"github.com/gogo/protobuf/proto"
+	"github.com/oxtoacart/bpool"
 	"github.com/pkg/errors"
 )
 
@@ -14,6 +15,12 @@ const (
 	// our big endian lenth prefix buffer.
 	prefixSize = 8
 )
+
+var bufpool *bpool.BytePool
+
+func init() {
+	bufpool = bpool.NewBytePool(64, prefixSize)
+}
 
 // NewEncoder creates a streaming protobuf encoder.
 func NewEncoder(w io.Writer) *Encoder {
@@ -29,7 +36,8 @@ type Encoder struct {
 // Encode takes any proto.Message and streams it to the underlying writer.
 // Messages are framed with a length prefix.
 func (e *Encoder) Encode(msg proto.Message) (int64, error) {
-	prefixBuf := make([]byte, prefixSize)
+	prefixBuf := bufpool.Get()
+	defer bufpool.Put(prefixBuf)
 
 	buf, err := proto.Marshal(msg)
 	if err != nil {
@@ -67,7 +75,8 @@ type Decoder struct {
 // Decode takes a proto.Message and unmarshals the next payload in the
 // underlying io.Reader. It returns an EOF when it's done.
 func (d *Decoder) Decode(v proto.Message) (int64, error) {
-	prefixBuf := make([]byte, prefixSize)
+	prefixBuf := bufpool.Get()
+	defer bufpool.Put(prefixBuf)
 
 	_, err := io.ReadFull(d.r, prefixBuf)
 	if err != nil {
