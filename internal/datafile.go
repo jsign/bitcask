@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"sync"
 
+	"github.com/oxtoacart/bpool"
 	"github.com/pkg/errors"
 	"golang.org/x/exp/mmap"
 
@@ -22,6 +23,9 @@ const (
 var (
 	ErrReadonly  = errors.New("error: read only datafile")
 	ErrReadError = errors.New("error: read error")
+
+	memPool   *bpool.BufferPool
+	mxMemPool sync.RWMutex
 )
 
 type Datafile struct {
@@ -137,7 +141,17 @@ func (df *Datafile) Read() (e pb.Entry, n int64, err error) {
 func (df *Datafile) ReadAt(index, size int64) (e pb.Entry, err error) {
 	var n int
 
-	b := make([]byte, size)
+	var b []byte
+	if memPool == nil {
+		b = make([]byte, size)
+	} else {
+		poolSlice := memPool.Get()
+		if poolSlice.Cap() < int(size) {
+			poolSlice.Grow(int(size) - poolSlice.Cap())
+		}
+		defer memPool.Put(poolSlice)
+		b = poolSlice.Bytes()[:size]
+	}
 
 	if df.w == nil {
 		n, err = df.ra.ReadAt(b, index)
@@ -176,4 +190,16 @@ func (df *Datafile) Write(e pb.Entry) (int64, int64, error) {
 	df.offset += n
 
 	return e.Offset, n, nil
+}
+
+// ConfigureMemPool configurate the mempool accordingly
+func ConfigureMemPool(maxConcurrency *int) {
+	mxMemPool.Lock()
+	defer mxMemPool.Unlock()
+	if maxConcurrency == nil {
+		memPool = nil
+	} else {
+		memPool = bpool.NewBufferPool(*maxConcurrency)
+	}
+	return
 }
