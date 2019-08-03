@@ -1,7 +1,6 @@
 package internal
 
 import (
-	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -10,12 +9,14 @@ import (
 	"github.com/pkg/errors"
 	"golang.org/x/exp/mmap"
 
+	"github.com/gogo/protobuf/proto"
 	pb "github.com/prologic/bitcask/internal/proto"
 	"github.com/prologic/bitcask/internal/streampb"
 )
 
 const (
 	DefaultDatafileFilename = "%09d.data"
+	prefixSize              = 8
 )
 
 var (
@@ -151,9 +152,10 @@ func (df *Datafile) ReadAt(index, size int64) (e pb.Entry, err error) {
 		return
 	}
 
-	buf := bytes.NewBuffer(b)
-	dec := streampb.NewDecoder(buf)
-	_, err = dec.Decode(&e)
+	err = proto.Unmarshal(b[prefixSize:], &e)
+	if err != nil {
+		return
+	}
 	return
 }
 
