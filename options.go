@@ -61,8 +61,8 @@ func WithMaxValueSize(size int) Option {
 	}
 }
 
-// WithMemPool indicate usage of memory pooling with specified parameters
-func WithMemPool(maxConcurrency, maxTotalPoolSize int) Option {
+// WithMemPool configures usage of a memory pool to avoid allocations
+func WithMemPool(maxConcurrency int) Option {
 	return func(cfg *config) error {
 		if maxConcurrency <= 0 {
 			return ErrMaxConcurrencyLowerEqZero

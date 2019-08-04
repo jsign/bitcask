@@ -518,7 +518,7 @@ func BenchmarkGet(b *testing.B) {
 				WithMaxValueSize(tt.size),
 			}
 			if tt.withPool {
-				options = append(options, WithMemPool(1, len(key)))
+				options = append(options, WithMemPool(1))
 			}
 			db, err := Open(testdir, options...)
 			if err != nil {
