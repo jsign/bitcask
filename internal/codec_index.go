@@ -102,7 +102,7 @@ func ReadIndex(r io.Reader, t art.Tree) error {
 	return nil
 }
 
-// WriteIndex persist a Tree into a io.Writer
+// WriteIndex persists a Tree into a io.Writer
 func WriteIndex(t art.Tree, w io.Writer) (err error) {
 	t.ForEach(func(node art.Node) bool {
 		_, err = writeBytes(node.Key(), w)
