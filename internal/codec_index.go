@@ -12,6 +12,8 @@ var (
 	errTruncatedKeySize = errors.New("key size is truncated")
 	errTruncatedKeyData = errors.New("key data is truncated")
 	errTruncatedData    = errors.New("data is truncated")
+	errKeySizeTooLarge  = errors.New("key size too large")
+	errDataSizeTooLarge = errors.New("data size too large")
 )
 
 const (
@@ -22,7 +24,7 @@ const (
 	sizeSize   = int64Size
 )
 
-func readKeyBytes(r io.Reader) ([]byte, error) {
+func readKeyBytes(r io.Reader, maxKeySize int) ([]byte, error) {
 	s := make([]byte, int32Size)
 	_, err := io.ReadFull(r, s)
 	if err != nil {
@@ -32,6 +34,10 @@ func readKeyBytes(r io.Reader) ([]byte, error) {
 		return nil, errors.Wrap(errTruncatedKeySize, err.Error())
 	}
 	size := binary.BigEndian.Uint32(s)
+	if size > uint32(maxKeySize) {
+		return nil, errKeySizeTooLarge
+	}
+
 	b := make([]byte, size)
 	_, err = io.ReadFull(r, b)
 	if err != nil {
@@ -54,17 +60,21 @@ func writeBytes(b []byte, w io.Writer) (int, error) {
 	return (n + m), nil
 }
 
-func readItem(r io.Reader) (Item, error) {
+func readItem(r io.Reader, maxValueSize int) (Item, error) {
 	buf := make([]byte, (fileIDSize + offsetSize + sizeSize))
 	_, err := io.ReadFull(r, buf)
 	if err != nil {
 		return Item{}, errors.Wrap(errTruncatedData, err.Error())
 	}
 
+	size := int64(binary.BigEndian.Uint64(buf[(fileIDSize + offsetSize):]))
+	if size > int64(maxValueSize) {
+		return Item{}, errDataSizeTooLarge
+	}
 	return Item{
 		FileID: int(binary.BigEndian.Uint32(buf[:fileIDSize])),
 		Offset: int64(binary.BigEndian.Uint64(buf[fileIDSize:(fileIDSize + offsetSize)])),
-		Size:   int64(binary.BigEndian.Uint64(buf[(fileIDSize + offsetSize):])),
+		Size:   size,
 	}, nil
 }
 
@@ -80,10 +90,10 @@ func writeItem(item Item, w io.Writer) (int, error) {
 	return n, nil
 }
 
-// ReadIndex reads a persisted tree from a io.Reader into a Tree
-func ReadIndex(r io.Reader, t art.Tree) error {
+// ReadIndex reads a persisted from a io.Reader into a Tree
+func ReadIndex(r io.Reader, t art.Tree, maxKeySize, maxValueSize int) error {
 	for {
-		key, err := readKeyBytes(r)
+		key, err := readKeyBytes(r, maxKeySize)
 		if err != nil {
 			if err == io.EOF {
 				break
@@ -91,7 +101,7 @@ func ReadIndex(r io.Reader, t art.Tree) error {
 			return err
 		}
 
-		item, err := readItem(r)
+		item, err := readItem(r, maxValueSize)
 		if err != nil {
 			return err
 		}
