@@ -15,7 +15,7 @@ const (
 	sizeSize   = int64Size
 )
 
-func ReadBytes(r io.Reader) ([]byte, error) {
+func readBytes(r io.Reader) ([]byte, error) {
 	s := make([]byte, int32Size)
 	_, err := io.ReadFull(r, s)
 	if err != nil {
@@ -30,7 +30,7 @@ func ReadBytes(r io.Reader) ([]byte, error) {
 	return b, nil
 }
 
-func WriteBytes(b []byte, w io.Writer) (int, error) {
+func writeBytes(b []byte, w io.Writer) (int, error) {
 	s := make([]byte, int32Size)
 	binary.BigEndian.PutUint32(s, uint32(len(b)))
 	n, err := w.Write(s)
@@ -44,7 +44,7 @@ func WriteBytes(b []byte, w io.Writer) (int, error) {
 	return (n + m), nil
 }
 
-func ReadItem(r io.Reader) (Item, error) {
+func readItem(r io.Reader) (Item, error) {
 	buf := make([]byte, (fileIDSize + offsetSize + sizeSize))
 	_, err := io.ReadFull(r, buf)
 	if err != nil {
@@ -58,7 +58,7 @@ func ReadItem(r io.Reader) (Item, error) {
 	}, nil
 }
 
-func WriteItem(item Item, w io.Writer) (int, error) {
+func writeItem(item Item, w io.Writer) (int, error) {
 	buf := make([]byte, (fileIDSize + offsetSize + sizeSize))
 	binary.BigEndian.PutUint32(buf[:fileIDSize], uint32(item.FileID))
 	binary.BigEndian.PutUint64(buf[fileIDSize:(fileIDSize+offsetSize)], uint64(item.Offset))
@@ -70,9 +70,10 @@ func WriteItem(item Item, w io.Writer) (int, error) {
 	return n, nil
 }
 
+// ReadIndex reads a persisted from a io.Reader into a Tree
 func ReadIndex(r io.Reader, t art.Tree) error {
 	for {
-		key, err := ReadBytes(r)
+		key, err := readBytes(r)
 		if err != nil {
 			if err == io.EOF {
 				break
@@ -80,7 +81,7 @@ func ReadIndex(r io.Reader, t art.Tree) error {
 			return err
 		}
 
-		item, err := ReadItem(r)
+		item, err := readItem(r)
 		if err != nil {
 			return err
 		}
@@ -91,15 +92,16 @@ func ReadIndex(r io.Reader, t art.Tree) error {
 	return nil
 }
 
+// WriteIndex persist a Tree into a io.Writer
 func WriteIndex(t art.Tree, w io.Writer) (err error) {
 	t.ForEach(func(node art.Node) bool {
-		_, err = WriteBytes(node.Key(), w)
+		_, err = writeBytes(node.Key(), w)
 		if err != nil {
 			return false
 		}
 
 		item := node.Value().(Item)
-		_, err := WriteItem(item, w)
+		_, err := writeItem(item, w)
 		if err != nil {
 			return false
 		}
