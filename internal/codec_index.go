@@ -8,15 +8,15 @@ import (
 )
 
 const (
-	Int32Size  = 4
-	Int64Size  = 8
-	FileIDSize = Int32Size
-	OffsetSize = Int64Size
-	SizeSize   = Int64Size
+	int32Size  = 4
+	int64Size  = 8
+	fileIDSize = int32Size
+	offsetSize = int64Size
+	sizeSize   = int64Size
 )
 
 func ReadBytes(r io.Reader) ([]byte, error) {
-	s := make([]byte, Int32Size)
+	s := make([]byte, int32Size)
 	_, err := io.ReadFull(r, s)
 	if err != nil {
 		return nil, err
@@ -31,7 +31,7 @@ func ReadBytes(r io.Reader) ([]byte, error) {
 }
 
 func WriteBytes(b []byte, w io.Writer) (int, error) {
-	s := make([]byte, Int32Size)
+	s := make([]byte, int32Size)
 	binary.BigEndian.PutUint32(s, uint32(len(b)))
 	n, err := w.Write(s)
 	if err != nil {
@@ -45,24 +45,24 @@ func WriteBytes(b []byte, w io.Writer) (int, error) {
 }
 
 func ReadItem(r io.Reader) (Item, error) {
-	buf := make([]byte, (FileIDSize + OffsetSize + SizeSize))
+	buf := make([]byte, (fileIDSize + offsetSize + sizeSize))
 	_, err := io.ReadFull(r, buf)
 	if err != nil {
 		return Item{}, err
 	}
 
 	return Item{
-		FileID: int(binary.BigEndian.Uint32(buf[:FileIDSize])),
-		Offset: int64(binary.BigEndian.Uint64(buf[FileIDSize:(FileIDSize + OffsetSize)])),
-		Size:   int64(binary.BigEndian.Uint64(buf[(FileIDSize + OffsetSize):])),
+		FileID: int(binary.BigEndian.Uint32(buf[:fileIDSize])),
+		Offset: int64(binary.BigEndian.Uint64(buf[fileIDSize:(fileIDSize + offsetSize)])),
+		Size:   int64(binary.BigEndian.Uint64(buf[(fileIDSize + offsetSize):])),
 	}, nil
 }
 
 func WriteItem(item Item, w io.Writer) (int, error) {
-	buf := make([]byte, (FileIDSize + OffsetSize + SizeSize))
-	binary.BigEndian.PutUint32(buf[:FileIDSize], uint32(item.FileID))
-	binary.BigEndian.PutUint64(buf[FileIDSize:(FileIDSize+OffsetSize)], uint64(item.Offset))
-	binary.BigEndian.PutUint64(buf[(FileIDSize+OffsetSize):], uint64(item.Size))
+	buf := make([]byte, (fileIDSize + offsetSize + sizeSize))
+	binary.BigEndian.PutUint32(buf[:fileIDSize], uint32(item.FileID))
+	binary.BigEndian.PutUint64(buf[fileIDSize:(fileIDSize+offsetSize)], uint64(item.Offset))
+	binary.BigEndian.PutUint64(buf[(fileIDSize+offsetSize):], uint64(item.Size))
 	n, err := w.Write(buf)
 	if err != nil {
 		return 0, err
