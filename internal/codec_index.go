@@ -46,18 +46,18 @@ func readKeyBytes(r io.Reader, maxKeySize int) ([]byte, error) {
 	return b, nil
 }
 
-func writeBytes(b []byte, w io.Writer) (int, error) {
+func writeBytes(b []byte, w io.Writer) error {
 	s := make([]byte, int32Size)
 	binary.BigEndian.PutUint32(s, uint32(len(b)))
-	n, err := w.Write(s)
+	_, err := w.Write(s)
 	if err != nil {
-		return n, err
+		return err
 	}
-	m, err := w.Write(b)
+	_, err = w.Write(b)
 	if err != nil {
-		return (n + m), err
+		return err
 	}
-	return (n + m), nil
+	return nil
 }
 
 func readItem(r io.Reader, maxValueSize int) (Item, error) {
@@ -78,16 +78,16 @@ func readItem(r io.Reader, maxValueSize int) (Item, error) {
 	}, nil
 }
 
-func writeItem(item Item, w io.Writer) (int, error) {
+func writeItem(item Item, w io.Writer) error {
 	buf := make([]byte, (fileIDSize + offsetSize + sizeSize))
 	binary.BigEndian.PutUint32(buf[:fileIDSize], uint32(item.FileID))
 	binary.BigEndian.PutUint64(buf[fileIDSize:(fileIDSize+offsetSize)], uint64(item.Offset))
 	binary.BigEndian.PutUint64(buf[(fileIDSize+offsetSize):], uint64(item.Size))
-	n, err := w.Write(buf)
+	_, err := w.Write(buf)
 	if err != nil {
-		return 0, err
+		return err
 	}
-	return n, nil
+	return nil
 }
 
 // ReadIndex reads a persisted from a io.Reader into a Tree
@@ -115,13 +115,13 @@ func ReadIndex(r io.Reader, t art.Tree, maxKeySize, maxValueSize int) error {
 // WriteIndex persists a Tree into a io.Writer
 func WriteIndex(t art.Tree, w io.Writer) (err error) {
 	t.ForEach(func(node art.Node) bool {
-		_, err = writeBytes(node.Key(), w)
+		err = writeBytes(node.Key(), w)
 		if err != nil {
 			return false
 		}
 
 		item := node.Value().(Item)
-		_, err := writeItem(item, w)
+		err := writeItem(item, w)
 		if err != nil {
 			return false
 		}
