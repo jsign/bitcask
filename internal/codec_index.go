@@ -4,7 +4,14 @@ import (
 	"encoding/binary"
 	"io"
 
+	"github.com/pkg/errors"
 	art "github.com/plar/go-adaptive-radix-tree"
+)
+
+var (
+	errTruncatedKeySize = errors.New("key size is truncated")
+	errTruncatedKeyData = errors.New("key data is truncated")
+	errTruncatedData    = errors.New("data is truncated")
 )
 
 const (
@@ -15,17 +22,20 @@ const (
 	sizeSize   = int64Size
 )
 
-func readBytes(r io.Reader) ([]byte, error) {
+func readKeyBytes(r io.Reader) ([]byte, error) {
 	s := make([]byte, int32Size)
 	_, err := io.ReadFull(r, s)
 	if err != nil {
-		return nil, err
+		if err == io.EOF {
+			return nil, err
+		}
+		return nil, errors.Wrap(errTruncatedKeySize, err.Error())
 	}
 	size := binary.BigEndian.Uint32(s)
 	b := make([]byte, size)
 	_, err = io.ReadFull(r, b)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(errTruncatedKeyData, err.Error())
 	}
 	return b, nil
 }
@@ -48,7 +58,7 @@ func readItem(r io.Reader) (Item, error) {
 	buf := make([]byte, (fileIDSize + offsetSize + sizeSize))
 	_, err := io.ReadFull(r, buf)
 	if err != nil {
-		return Item{}, err
+		return Item{}, errors.Wrap(errTruncatedData, err.Error())
 	}
 
 	return Item{
@@ -73,7 +83,7 @@ func writeItem(item Item, w io.Writer) (int, error) {
 // ReadIndex reads a persisted from a io.Reader into a Tree
 func ReadIndex(r io.Reader, t art.Tree) error {
 	for {
-		key, err := readBytes(r)
+		key, err := readKeyBytes(r)
 		if err != nil {
 			if err == io.EOF {
 				break
