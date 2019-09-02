@@ -80,7 +80,7 @@ func writeItem(item Item, w io.Writer) (int, error) {
 	return n, nil
 }
 
-// ReadIndex reads a persisted from a io.Reader into a Tree
+// ReadIndex reads a persisted tree from a io.Reader into a Tree
 func ReadIndex(r io.Reader, t art.Tree) error {
 	for {
 		key, err := readKeyBytes(r)
