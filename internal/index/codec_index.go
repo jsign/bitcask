@@ -1,4 +1,4 @@
-package internal
+package index
 
 import (
 	"encoding/binary"
@@ -6,6 +6,7 @@ import (
 
 	"github.com/pkg/errors"
 	art "github.com/plar/go-adaptive-radix-tree"
+	"github.com/prologic/bitcask/internal"
 )
 
 var (
@@ -60,25 +61,25 @@ func writeBytes(b []byte, w io.Writer) error {
 	return nil
 }
 
-func readItem(r io.Reader, maxValueSize int) (Item, error) {
+func readItem(r io.Reader, maxValueSize int) (internal.Item, error) {
 	buf := make([]byte, (fileIDSize + offsetSize + sizeSize))
 	_, err := io.ReadFull(r, buf)
 	if err != nil {
-		return Item{}, errors.Wrap(errTruncatedData, err.Error())
+		return internal.Item{}, errors.Wrap(errTruncatedData, err.Error())
 	}
 
 	size := int64(binary.BigEndian.Uint64(buf[(fileIDSize + offsetSize):]))
 	if size > int64(maxValueSize) {
-		return Item{}, errDataSizeTooLarge
+		return internal.Item{}, errDataSizeTooLarge
 	}
-	return Item{
+	return internal.Item{
 		FileID: int(binary.BigEndian.Uint32(buf[:fileIDSize])),
 		Offset: int64(binary.BigEndian.Uint64(buf[fileIDSize:(fileIDSize + offsetSize)])),
 		Size:   size,
 	}, nil
 }
 
-func writeItem(item Item, w io.Writer) error {
+func writeItem(item internal.Item, w io.Writer) error {
 	buf := make([]byte, (fileIDSize + offsetSize + sizeSize))
 	binary.BigEndian.PutUint32(buf[:fileIDSize], uint32(item.FileID))
 	binary.BigEndian.PutUint64(buf[fileIDSize:(fileIDSize+offsetSize)], uint64(item.Offset))
@@ -90,8 +91,9 @@ func writeItem(item Item, w io.Writer) error {
 	return nil
 }
 
-// ReadIndex reads a persisted from a io.Reader into a Tree
-func ReadIndex(r io.Reader, t art.Tree, maxKeySize, maxValueSize int) error {
+// ReadIndex reads a persisted from a io.Reader into a Tree.
+// If an error is returned, t is the partial read tree up to the error point.
+func read(r io.Reader, t art.Tree, maxKeySize, maxValueSize int) error {
 	for {
 		key, err := readKeyBytes(r, maxKeySize)
 		if err != nil {
@@ -120,7 +122,7 @@ func WriteIndex(t art.Tree, w io.Writer) (err error) {
 			return false
 		}
 
-		item := node.Value().(Item)
+		item := node.Value().(internal.Item)
 		err := writeItem(item, w)
 		if err != nil {
 			return false
@@ -129,4 +131,15 @@ func WriteIndex(t art.Tree, w io.Writer) (err error) {
 		return true
 	})
 	return
+}
+
+// IsIndexCorruption returns a boolean indicating whether the error
+// is known to report a corruption data issue
+func IsIndexCorruption(err error) bool {
+	cause := errors.Cause(err)
+	switch cause {
+	case errDataSizeTooLarge, errKeySizeTooLarge, errTruncatedData, errTruncatedKeyData, errTruncatedKeySize:
+		return true
+	}
+	return false
 }
