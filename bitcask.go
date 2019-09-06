@@ -14,6 +14,7 @@ import (
 	"github.com/gofrs/flock"
 	art "github.com/plar/go-adaptive-radix-tree"
 	"github.com/prologic/bitcask/internal"
+	"github.com/prologic/bitcask/internal/config"
 	"github.com/prologic/bitcask/internal/data"
 	"github.com/prologic/bitcask/internal/index"
 )
@@ -47,7 +48,7 @@ type Bitcask struct {
 
 	*flock.Flock
 
-	config    *config
+	config    *config.Config
 	options   []Option
 	path      string
 	curr      *data.Datafile
@@ -160,10 +161,10 @@ func (b *Bitcask) Has(key []byte) bool {
 
 // Put stores the key and value in the database.
 func (b *Bitcask) Put(key, value []byte) error {
-	if len(key) > b.config.maxKeySize {
+	if len(key) > b.config.MaxKeySize {
 		return ErrKeyTooLarge
 	}
-	if len(value) > b.config.maxValueSize {
+	if len(value) > b.config.MaxValueSize {
 		return ErrValueTooLarge
 	}
 
@@ -172,7 +173,7 @@ func (b *Bitcask) Put(key, value []byte) error {
 		return err
 	}
 
-	if b.config.sync {
+	if b.config.Sync {
 		if err := b.curr.Sync(); err != nil {
 			return err
 		}
@@ -271,7 +272,7 @@ func (b *Bitcask) put(key, value []byte) (int64, int64, error) {
 	defer b.mu.Unlock()
 
 	size := b.curr.Size()
-	if size >= int64(b.config.maxDatafileSize) {
+	if size >= int64(b.config.MaxDatafileSize) {
 		err := b.curr.Close()
 		if err != nil {
 			return -1, 0, err
@@ -330,7 +331,7 @@ func (b *Bitcask) reopen() error {
 		datafiles[id] = df
 	}
 
-	t, found, err := index.ReadFromFile(b.path, b.config.maxKeySize)
+	t, found, err := index.ReadFromFile(b.path, b.config.MaxKeySize)
 	if err != nil {
 		return err
 	}
@@ -461,7 +462,7 @@ func (b *Bitcask) Merge() error {
 // configuration options as functions.
 func Open(path string, options ...Option) (*Bitcask, error) {
 	var (
-		cfg *config
+		cfg *config.Config
 		err error
 	)
 
@@ -469,7 +470,7 @@ func Open(path string, options ...Option) (*Bitcask, error) {
 		return nil, err
 	}
 
-	cfg, err = getConfig(path)
+	cfg, err = config.Decode(path)
 	if err != nil {
 		cfg = newDefaultConfig()
 	}

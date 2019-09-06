@@ -4,6 +4,7 @@ import (
 	"os"
 
 	"github.com/prologic/bitcask"
+	"github.com/prologic/bitcask/internal/config"
 	"github.com/prologic/bitcask/internal/index"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -18,6 +19,9 @@ var recoveryCmd = &cobra.Command{
 persisted files. It also allows to recover the files to the latest point of integrity.
 Recovered files have the .recovered extension`,
 	Args: cobra.ExactArgs(0),
+	PreRun: func(cmd *cobra.Command, args []string) {
+		viper.BindPFlag("dry-run", cmd.Flags().Lookup("dry-run"))
+	},
 	Run: func(cmd *cobra.Command, args []string) {
 		path := viper.GetString("path")
 		dryRun := viper.GetBool("dry-run")
@@ -28,11 +32,15 @@ Recovered files have the .recovered extension`,
 func init() {
 	RootCmd.AddCommand(recoveryCmd)
 	recoveryCmd.Flags().BoolP("dry-run", "n", false, "Will only check files health without applying recovery if unhealthy")
-	viper.BindPFlag("dry-run", recoveryCmd.Flags().Lookup("dry-run"))
 }
 
 func recover(path string, dryRun bool) int {
-	t, found, err := index.ReadFromFile(path, bitcask.DefaultMaxKeySize)
+	maxKeySize := bitcask.DefaultMaxKeySize
+	if cfg, err := config.Decode(path); err == nil {
+		maxKeySize = cfg.MaxKeySize
+	}
+
+	t, found, err := index.ReadFromFile(path, maxKeySize)
 	if err != nil && !index.IsIndexCorruption(err) {
 		log.WithError(err).Info("error while opening the index file")
 	}
