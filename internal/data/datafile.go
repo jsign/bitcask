@@ -12,14 +12,16 @@ import (
 )
 
 const (
+	// DefaultDatafileFilename is the default name template for
+	// a datafile
 	DefaultDatafileFilename = "%09d.data"
 )
 
 var (
-	ErrReadonly  = errors.New("error: read only datafile")
+	// ErrReadonly error when trying to write a read-only datafile
+	ErrReadonly = errors.New("error: read only datafile")
+	// ErrReadError error when unable to read datafile
 	ErrReadError = errors.New("error: read error")
-
-	mxMemPool sync.RWMutex
 )
 
 type Datafile interface {
