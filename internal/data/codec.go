@@ -10,28 +10,28 @@ import (
 )
 
 const (
-	KeySize      = 4
-	ValueSize    = 8
+	keySize      = 4
+	valueSize    = 8
 	checksumSize = 4
 )
 
 // NewEncoder creates a streaming Entry encoder.
-func NewEncoder(w io.Writer) *Encoder {
-	return &Encoder{w: bufio.NewWriter(w)}
+func newEncoder(w io.Writer) *encoder {
+	return &encoder{w: bufio.NewWriter(w)}
 }
 
-// Encoder wraps an underlying io.Writer and allows you to stream
+// encoder wraps an underlying io.Writer and allows you to stream
 // Entry encodings on it.
-type Encoder struct {
+type encoder struct {
 	w *bufio.Writer
 }
 
 // Encode takes any Entry and streams it to the underlying writer.
 // Messages are framed with a key-length and value-length prefix.
-func (e *Encoder) Encode(msg internal.Entry) (int64, error) {
-	var bufKeyValue = make([]byte, KeySize+ValueSize)
-	binary.BigEndian.PutUint32(bufKeyValue[:KeySize], uint32(len(msg.Key)))
-	binary.BigEndian.PutUint64(bufKeyValue[KeySize:KeySize+ValueSize], uint64(len(msg.Value)))
+func (e *encoder) encode(msg internal.Entry) (int64, error) {
+	var bufKeyValue = make([]byte, keySize+valueSize)
+	binary.BigEndian.PutUint32(bufKeyValue[:keySize], uint32(len(msg.Key)))
+	binary.BigEndian.PutUint64(bufKeyValue[keySize:keySize+valueSize], uint64(len(msg.Value)))
 	if _, err := e.w.Write(bufKeyValue); err != nil {
 		return 0, errors.Wrap(err, "failed writing key & value length prefix")
 	}
@@ -53,46 +53,46 @@ func (e *Encoder) Encode(msg internal.Entry) (int64, error) {
 		return 0, errors.Wrap(err, "failed flushing data")
 	}
 
-	return int64(KeySize + ValueSize + len(msg.Key) + len(msg.Value) + checksumSize), nil
+	return int64(keySize + valueSize + len(msg.Key) + len(msg.Value) + checksumSize), nil
 }
 
 // NewDecoder creates a streaming Entry decoder.
-func NewDecoder(r io.Reader) *Decoder {
-	return &Decoder{r: r}
+func newDecoder(r io.Reader) *decoder {
+	return &decoder{r: r}
 }
 
-// Decoder wraps an underlying io.Reader and allows you to stream
+// decoder wraps an underlying io.Reader and allows you to stream
 // Entry decodings on it.
-type Decoder struct {
+type decoder struct {
 	r io.Reader
 }
 
-func (d *Decoder) Decode(v *internal.Entry) (int64, error) {
-	prefixBuf := make([]byte, KeySize+ValueSize)
+func (d *decoder) decode(v *internal.Entry) (int64, error) {
+	prefixBuf := make([]byte, keySize+valueSize)
 
 	_, err := io.ReadFull(d.r, prefixBuf)
 	if err != nil {
 		return 0, err
 	}
 
-	actualKeySize, actualValueSize := GetKeyValueSizes(prefixBuf)
+	actualKeySize, actualValueSize := getKeyValueSizes(prefixBuf)
 	buf := make([]byte, actualKeySize+actualValueSize+checksumSize)
 	if _, err = io.ReadFull(d.r, buf); err != nil {
 		return 0, errors.Wrap(translateError(err), "failed reading saved data")
 	}
 
-	DecodeWithoutPrefix(buf, actualKeySize, v)
-	return int64(KeySize + ValueSize + actualKeySize + actualValueSize + checksumSize), nil
+	decodeWithoutPrefix(buf, actualKeySize, v)
+	return int64(keySize + valueSize + actualKeySize + actualValueSize + checksumSize), nil
 }
 
-func GetKeyValueSizes(buf []byte) (uint64, uint64) {
-	actualKeySize := binary.BigEndian.Uint32(buf[:KeySize])
-	actualValueSize := binary.BigEndian.Uint64(buf[KeySize:])
+func getKeyValueSizes(buf []byte) (uint64, uint64) {
+	actualKeySize := binary.BigEndian.Uint32(buf[:keySize])
+	actualValueSize := binary.BigEndian.Uint64(buf[keySize:])
 
 	return uint64(actualKeySize), actualValueSize
 }
 
-func DecodeWithoutPrefix(buf []byte, valueOffset uint64, v *internal.Entry) {
+func decodeWithoutPrefix(buf []byte, valueOffset uint64, v *internal.Entry) {
 	v.Key = buf[:valueOffset]
 	v.Value = buf[valueOffset : len(buf)-checksumSize]
 	v.Checksum = binary.BigEndian.Uint32(buf[len(buf)-checksumSize:])

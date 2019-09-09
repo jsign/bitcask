@@ -41,8 +41,8 @@ type datafile struct {
 	ra     *mmap.ReaderAt
 	w      *os.File
 	offset int64
-	dec    *Decoder
-	enc    *Encoder
+	dec    *decoder
+	enc    *encoder
 }
 
 func NewDatafile(path string, id int, readonly bool) (Datafile, error) {
@@ -78,8 +78,8 @@ func NewDatafile(path string, id int, readonly bool) (Datafile, error) {
 
 	offset := stat.Size()
 
-	dec := NewDecoder(r)
-	enc := NewEncoder(w)
+	dec := newDecoder(r)
+	enc := newEncoder(w)
 
 	return &datafile{
 		id:     id,
@@ -135,7 +135,7 @@ func (df *datafile) Read() (e internal.Entry, n int64, err error) {
 	df.Lock()
 	defer df.Unlock()
 
-	n, err = df.dec.Decode(&e)
+	n, err = df.dec.decode(&e)
 	if err != nil {
 		return
 	}
@@ -161,8 +161,8 @@ func (df *datafile) ReadAt(index, size int64) (e internal.Entry, err error) {
 		return
 	}
 
-	valueOffset, _ := GetKeyValueSizes(b)
-	DecodeWithoutPrefix(b[KeySize+ValueSize:], valueOffset, &e)
+	valueOffset, _ := getKeyValueSizes(b)
+	decodeWithoutPrefix(b[keySize+valueSize:], valueOffset, &e)
 
 	return
 }
@@ -177,7 +177,7 @@ func (df *datafile) Write(e internal.Entry) (int64, int64, error) {
 
 	e.Offset = df.offset
 
-	n, err := df.enc.Encode(e)
+	n, err := df.enc.encode(e)
 	if err != nil {
 		return -1, 0, err
 	}
