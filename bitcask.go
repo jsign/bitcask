@@ -474,7 +474,7 @@ func loadIndex(path string, indexer index.Indexer, maxKeySize uint32, datafiles 
 		return nil, err
 	}
 	if !found {
-		for i, df := range datafiles {
+		for _, df := range datafiles {
 			var offset int64
 			for {
 				e, n, err := df.Read()
