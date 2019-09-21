@@ -491,7 +491,7 @@ func loadIndex(path string, indexer index.Indexer, maxKeySize uint32, datafiles 
 					offset += n
 					continue
 				}
-				item := internal.Item{FileID: i, Offset: offset, Size: n}
+				item := internal.Item{FileID: df.FileID(), Offset: offset, Size: n}
 				t.Insert(e.Key, item)
 				offset += n
 			}
